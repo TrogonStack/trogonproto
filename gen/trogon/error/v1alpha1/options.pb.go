@@ -24,6 +24,11 @@ const (
 )
 
 // MessageOptions defines message-level options for error payload messages.
+//
+// These annotations describe the Google RPC rich error details a runtime
+// should emit for this payload. They are not a transport envelope; runtimes
+// adapt the template into google.rpc.Status, google.rpc.ErrorInfo, google.rpc.Help,
+// or equivalent protocol-native details.
 type MessageOptions struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// template specifies the static error template for this message.
@@ -72,11 +77,14 @@ func (x *MessageOptions) GetTemplate() *MessageOptions_Template {
 }
 
 // FieldOptions defines field-level options for error payload message fields.
+//
+// Runtimes copy payload fields into google.rpc.ErrorInfo.metadata unless a
+// value policy supplies a default or fixed value.
 type FieldOptions struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// visibility controls who can see this metadata field at runtime.
 	//
-	// When unset, defaults to INTERNAL for safety.
+	// UNSPECIFIED is invalid for emitted error details.
 	Visibility Visibility `protobuf:"varint,1,opt,name=visibility,proto3,enum=trogon.error.v1alpha1.Visibility" json:"visibility,omitempty"`
 	// Types that are valid to be assigned to ValuePolicy:
 	//
@@ -170,31 +178,32 @@ func (*FieldOptions_DefaultValue) isFieldOptions_ValuePolicy() {}
 func (*FieldOptions_Value) isFieldOptions_ValuePolicy() {}
 
 // Template defines the static error template for a message that can be
-// adapted into a runtime error representation.
+// adapted into a runtime Google RPC error representation.
 //
 // These fields are intentionally language-neutral so both Elixir and Go
 // runtimes can derive their native error template APIs from the same proto
 // annotation.
 type MessageOptions_Template struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// domain identifies the logical owner of the error contract.
+	// domain maps to google.rpc.ErrorInfo.domain.
 	// Example: "compute.googleapis.com"
 	Domain string `protobuf:"bytes,1,opt,name=domain,proto3" json:"domain,omitempty"`
-	// reason identifies the stable machine-readable error reason.
+	// reason maps to google.rpc.ErrorInfo.reason.
 	// Example: "RESOURCE_AVAILABILITY"
 	Reason string `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
-	// message is the default human-readable message template.
+	// message maps to google.rpc.Status.message.
 	Message string `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
-	// code is the canonical error code for the template.
+	// code maps to google.rpc.Status.code.
 	Code Code `protobuf:"varint,4,opt,name=code,proto3,enum=trogon.error.v1alpha1.Code" json:"code,omitempty"`
 	// visibility controls who can see this error at runtime.
-	// When unset, defaults to INTERNAL for safety.
+	// UNSPECIFIED is invalid for emitted error details.
 	Visibility Visibility `protobuf:"varint,5,opt,name=visibility,proto3,enum=trogon.error.v1alpha1.Visibility" json:"visibility,omitempty"`
-	// help_links provides documentation or support links for this error.
+	// help_links maps to google.rpc.Help links.
 	HelpLinks []*MessageOptions_HelpLink `protobuf:"bytes,6,rep,name=help_links,json=helpLinks,proto3" json:"help_links,omitempty"`
 	// metadata declares fixed key/value pairs attached to every emission
-	// of this error. Unlike struct fields with FieldOptions.value, these
-	// entries have no wire representation on the payload message — they
+	// of this error. Runtimes copy these entries into
+	// google.rpc.ErrorInfo.metadata. Unlike struct fields with FieldOptions.value,
+	// these entries have no wire representation on the payload message — they
 	// are part of the error contract itself.
 	//
 	// Keys must be unique within a template and must not collide with
@@ -343,8 +352,8 @@ func (x *MessageOptions_HelpLink) GetDescription() string {
 // MetadataEntry declares a fixed metadata pair on a Template.
 type MessageOptions_MetadataEntry struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// key is the metadata key. Lowercase snake_case, matching the
-	// convention used for FieldOptions-derived metadata keys.
+	// key is the metadata key. Use lowerCamelCase to match
+	// google.rpc.ErrorInfo.metadata guidance.
 	Key string `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	// value is the literal value attached at every emission. Template
 	// metadata is fixed by definition, so there is no `default_value`
@@ -352,7 +361,7 @@ type MessageOptions_MetadataEntry struct {
 	// a struct field can supply a runtime override.
 	Value string `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
 	// visibility controls who can see this metadata at runtime.
-	// When unset, defaults to INTERNAL for safety.
+	// UNSPECIFIED is invalid for emitted error details.
 	Visibility    Visibility `protobuf:"varint,3,opt,name=visibility,proto3,enum=trogon.error.v1alpha1.Visibility" json:"visibility,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -448,13 +457,12 @@ var (
 	//	    visibility: VISIBILITY_PUBLIC,
 	//	    help_links: [{url: "https://docs.acme.com/compute", description: "Compute Docs"}],
 	//	    metadata: [
-	//	      {key: "component", value: "compute", visibility: VISIBILITY_PUBLIC},
-	//	      {key: "team",      value: "platform-compute", visibility: VISIBILITY_INTERNAL}
+	//	      {key: "component", value: "compute", visibility: VISIBILITY_PUBLIC}
 	//	    ]
 	//	  };
 	//
-	//	  string zone = 1;
-	//	  string vm_type = 2;
+	//	  string zone = 1 [(trogon.error.v1alpha1.field).visibility = VISIBILITY_PUBLIC];
+	//	  string vm_type = 2 [(trogon.error.v1alpha1.field).visibility = VISIBILITY_PUBLIC];
 	//	  string service = 3 [(trogon.error.v1alpha1.field) = {
 	//	    visibility: VISIBILITY_PUBLIC,
 	//	    default_value: "compute-api"
@@ -485,11 +493,11 @@ var (
 	//	    domain: "identity.acme.com",
 	//	    reason: "USER_NOT_FOUND",
 	//	    message: "The requested user was not found.",
-	//	    code: NOT_FOUND
+	//	    code: NOT_FOUND,
+	//	    visibility: VISIBILITY_PUBLIC
 	//	  };
 	//
 	//	  string user_id = 1 [(trogon.error.v1alpha1.field).visibility = VISIBILITY_PUBLIC];
-	//	  string internal_trace = 2; // defaults to INTERNAL
 	//	}
 	//
 	// optional trogon.error.v1alpha1.FieldOptions field = 870013;
