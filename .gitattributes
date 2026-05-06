@@ -1,0 +1,6 @@
+* text=auto eol=lf
+
+# Mark generated protobuf bindings so GitHub collapses diffs and excludes
+# them from language statistics.
+gen/** linguist-generated=true
+*.pb.go linguist-generated=true
