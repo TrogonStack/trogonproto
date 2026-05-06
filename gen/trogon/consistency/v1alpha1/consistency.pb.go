@@ -109,7 +109,7 @@ type Consistency struct {
 	// - Maximum: 5s (values above should be clamped and logged)
 	//
 	// If projection doesn't reach required version within timeout, query should return
-	// unavailable error with appropriate error metadata (e.g., projection_timeout).
+	// unavailable error with appropriate error metadata (e.g., projectionTimeout).
 	TimeoutDuration *durationpb.Duration `protobuf:"bytes,3,opt,name=timeout_duration,json=timeoutDuration,proto3,oneof" json:"timeout_duration,omitempty"`
 	// Delay between retry attempts.
 	//
